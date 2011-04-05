@@ -110,6 +110,13 @@ namespace Dicom.Data {
 				} else
 					_pixelPaddingValue = MinimumDataValue;
 			}
+
+      // fix some common errors in dicom files
+      if (_samplesPerPixel == 0)
+        _samplesPerPixel = 1;
+
+      if (_rescaleSlope == 0.0)
+        _rescaleSlope = 1.0;
 		}
 		#endregion
 
@@ -317,7 +324,7 @@ namespace Dicom.Data {
 				int offset = size * frame;
 				byte[] buffer = new byte[size];
 				ByteBuffer data = PixelDataElement.ByteBuffer;
-				Buffer.BlockCopy(data.ToBytes(), offset, buffer, 0, size);
+        buffer = data.GetChunk(offset, size);
 				if (BytesAllocated > 1 && data.Endian != Endian.LocalMachine)
 					Endian.SwapBytes(BytesAllocated, buffer);
 				else if (PixelDataItem.VR == DicomVR.OW && data.Endian == Endian.Big)
@@ -355,7 +362,7 @@ namespace Dicom.Data {
 				int offset = size * frame;
 				ushort[] buffer = new ushort[size / 2];
 				ByteBuffer data = PixelDataElement.ByteBuffer;
-				Buffer.BlockCopy(data.ToBytes(), offset, buffer, 0, size);
+				Buffer.BlockCopy(data.GetChunk(offset, size), offset, buffer, 0, size);
 				return buffer;
 			}
 		}

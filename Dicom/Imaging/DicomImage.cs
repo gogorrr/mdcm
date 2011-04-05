@@ -53,18 +53,25 @@ namespace Dicom.Imaging {
 		/// <summary>Renders DICOM image to System.Drawing.Image</summary>
 		/// <returns>Rendered image</returns>
 		public Image Render() {
-			ImageGraphic graphic = new ImageGraphic(_pixelData);
-			return graphic.RenderImage(_pipeline.LUT);
+      return Render(0);
 		}
+
+    /// <summary>Renders DICOM image to System.Drawing.Image</summary>
+    /// <param name="frame">Frame number</param>
+    /// <returns>Rendered image</returns>
+    public Image Render(int frame) {
+      DcmPixelData pixelData = new DcmPixelData(Dataset);
+      _pixelData = PixelDataFactory.Create(pixelData, frame);
+      _pipeline = PipelineFactory.Create(Dataset, pixelData);
+      pixelData.Unload();
+      ImageGraphic graphic = new ImageGraphic(_pixelData);
+      return graphic.RenderImage(_pipeline.LUT);
+    }
 
 		private void Load(DcmDataset dataset) {
 			Dataset = dataset;
 			if (Dataset.InternalTransferSyntax.IsEncapsulated)
 				Dataset.ChangeTransferSyntax(DicomTransferSyntax.ExplicitVRLittleEndian, null);
-			DcmPixelData pixelData = new DcmPixelData(Dataset);
-			_pixelData = PixelDataFactory.Create(pixelData, 0);
-			_pipeline = PipelineFactory.Create(Dataset, pixelData);
-			pixelData.Unload();
 		}
 	}
 }

@@ -252,7 +252,8 @@ namespace Dicom.IO {
 					}
 
 					if (_vr == DicomVR.UN && _syntax.IsExplicitVR && Flags.IsSet(options, DicomReadOptions.UseDictionaryForExplicitUN)) {
-						_vr = _tag.Entry.DefaultVR;
+            if (_tag.Entry.DefaultVR != DicomVR.NONE)
+              _vr = _tag.Entry.DefaultVR;
 					}
 
 					if (_fragment != null) {

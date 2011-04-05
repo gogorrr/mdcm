@@ -57,7 +57,7 @@ namespace Dicom.Data {
 
 		private DicomUID() { }
 
-		internal DicomUID(string uid, string desc, DicomUidType type) {
+		public DicomUID(string uid, string desc, DicomUidType type) {
 			UID = uid;
 			Description = desc;
 			Type = type;
