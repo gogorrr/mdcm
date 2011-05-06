@@ -60,7 +60,7 @@ namespace Dicom.Data {
 		#endregion
 
 		#region DcmItem Overrides
-		internal override uint CalculateWriteLength(DicomTransferSyntax syntax, DicomWriteOptions options) {
+		public override uint CalculateWriteLength(DicomTransferSyntax syntax, DicomWriteOptions options) {
 			uint length = 4 + 4;
 			length += Dataset.CalculateWriteLength(syntax, options & ~DicomWriteOptions.CalculateGroupLengths);
 			if (!Flags.IsSet(options, DicomWriteOptions.ExplicitLengthSequenceItem))
@@ -127,7 +127,7 @@ namespace Dicom.Data {
 			_items.Add(item);
 		}
 
-		internal override uint CalculateWriteLength(DicomTransferSyntax syntax, DicomWriteOptions options) {
+		public override uint CalculateWriteLength(DicomTransferSyntax syntax, DicomWriteOptions options) {
 			uint length = 0;
 			length += 4; // element tag
 			if (syntax.IsExplicitVR) {

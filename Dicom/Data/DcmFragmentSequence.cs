@@ -86,7 +86,7 @@ namespace Dicom.Data {
 		#endregion
 
 		#region DcmItem Methods
-		internal override uint CalculateWriteLength(DicomTransferSyntax syntax, DicomWriteOptions options) {
+		public override uint CalculateWriteLength(DicomTransferSyntax syntax, DicomWriteOptions options) {
 			uint length = 0;
 			length += 4; // element tag
 			if (syntax.IsExplicitVR) {

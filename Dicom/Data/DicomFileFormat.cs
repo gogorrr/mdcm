@@ -150,9 +150,9 @@ namespace Dicom.Data {
 			bool isDicom = false;
 			using (FileStream fs = File.OpenRead(file)) {
 				fs.Seek(128, SeekOrigin.Begin);
-				if (fs.ReadByte() == (byte)'D' ||
-					fs.ReadByte() == (byte)'I' ||
-					fs.ReadByte() == (byte)'C' ||
+				if (fs.ReadByte() == (byte)'D' &&
+					fs.ReadByte() == (byte)'I' &&
+					fs.ReadByte() == (byte)'C' &&
 					fs.ReadByte() == (byte)'M')
 					isDicom = true;
 				fs.Close();

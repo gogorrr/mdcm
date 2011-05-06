@@ -86,7 +86,7 @@ namespace Dicom.Data {
 		#endregion
 
 		#region Methods to Override
-		internal abstract uint CalculateWriteLength(DicomTransferSyntax syntax, DicomWriteOptions options);
+		public abstract uint CalculateWriteLength(DicomTransferSyntax syntax, DicomWriteOptions options);
 
 		protected abstract void ChangeEndianInternal();
 
