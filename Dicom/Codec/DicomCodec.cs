@@ -34,6 +34,7 @@ namespace Dicom.Codec {
 		DcmCodecParameters GetDefaultParameters();
 		void Encode(DcmDataset dataset, DcmPixelData oldPixelData, DcmPixelData newPixelData, DcmCodecParameters parameters);
 		void Decode(DcmDataset dataset, DcmPixelData oldPixelData, DcmPixelData newPixelData, DcmCodecParameters parameters);
+		void Decode(DcmDataset dataset, DcmPixelData oldPixelData, DcmPixelData newPixelData, DcmCodecParameters parameters, int frame);
 	}
 	#endregion
 

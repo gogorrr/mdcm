@@ -104,6 +104,40 @@ namespace Jpeg {
 		}
 	}
 
+	void DcmJpegCodec::Decode(DcmDataset^ dataset, DcmPixelData^ oldPixelData, DcmPixelData^ newPixelData, DcmCodecParameters^ parameters, int frame)
+	{
+		if (oldPixelData->NumberOfFrames == 0)
+			return;
+
+		// IJG eats the extra padding bits. Is there a better way to test for this?
+		if (newPixelData->BitsAllocated == 16 && newPixelData->BitsStored <= 8) {
+			// check for embedded overlays here or below?
+			newPixelData->BitsAllocated = 8;
+		}
+
+		if (parameters == nullptr || parameters->GetType() != DcmJpegParameters::typeid)
+			parameters = GetDefaultParameters();
+
+		DcmJpegParameters^ jparams = (DcmJpegParameters^)parameters;
+
+		int precision = 0;
+		try {
+			precision = JpegHelper::ScanHeaderForBitDepth(oldPixelData);
+		}
+		catch (...) {
+			// the old scanner choked on several valid images...
+			// assume the correct encoder was used and let libijg handle the rest
+			precision = oldPixelData->BitsStored;
+		}
+
+		if (newPixelData->BitsStored <= 8 && precision > 8)
+			newPixelData->BitsAllocated = 16; // embedded overlay?
+
+		IJpegCodec^ codec = GetCodec(precision, jparams);
+
+		codec->Decode(oldPixelData, newPixelData, jparams, frame);
+	}
+
 	void DcmJpegCodec::Register() {
 		DicomCodec::RegisterCodec(DicomTransferSyntax::JPEGProcess1, DcmJpegProcess1Codec::typeid);
 		DicomCodec::RegisterCodec(DicomTransferSyntax::JPEGProcess2_4, DcmJpegProcess4Codec::typeid);

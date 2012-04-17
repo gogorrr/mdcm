@@ -368,24 +368,41 @@ namespace Dicom.Data {
 		}
 
 		public short[] GetFrameDataS16(int frame) {
-			if (frame < 0 || frame >= NumberOfFrames)
-				throw new IndexOutOfRangeException("Requested frame out of range!");
+            if (frame < 0 || frame >= NumberOfFrames)
+                throw new IndexOutOfRangeException("Requested frame out of range!");
 
-			unchecked {
-				int sign = 1 << HighBit;
-				int mask = sign - 1;
-				int count = ImageWidth * ImageHeight;
-				short[] pixels = new short[count];
-				ushort[] data = GetFrameDataU16(frame);
-				for (int p = 0; p < count; p++) {
-					ushort d = data[p];
-					if ((d & sign) != 0)
-						pixels[p] = (short)-(d & mask);
-					else
-						pixels[p] = (short)(d & mask);
-				}
-				return pixels;
-			}
+            if (IsFragmented)
+            {
+                List<ByteBuffer> fragments = GetFrameFragments(frame);
+
+                int size = 0;
+                foreach (ByteBuffer fragment in fragments)
+                {
+                    size += fragment.Length;
+                }
+                size /= 2;
+
+                int pos = 0;
+                short[] buffer = new short[size];
+
+                foreach (ByteBuffer fragment in fragments)
+                {
+                    byte[] data = fragment.ToBytes();
+                    Buffer.BlockCopy(data, 0, buffer, pos, data.Length);
+                    pos += data.Length;
+                }
+
+                return buffer;
+            }
+            else
+            {
+                int size = UncompressedFrameSize;
+                int offset = size * frame;
+                short[] buffer = new short[size / 2];
+                ByteBuffer data = PixelDataElement.ByteBuffer;
+                Buffer.BlockCopy(data.GetChunk(offset, size), offset, buffer, 0, size);
+                return buffer;
+            }
 		}
 
 		public int[] GetFrameDataS32(int frame) {

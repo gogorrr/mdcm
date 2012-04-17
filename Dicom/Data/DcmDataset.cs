@@ -325,7 +325,7 @@ namespace Dicom.Data {
 		}
 
 		public bool AddElementWithValue(DicomTag tag, DicomUID value) {
-			return AddElementWithValue(tag, value.UID);
+			return AddElementWithValue(tag,  (value != null) ? value.UID : null);
 		}
 
 		public bool AddElementWithObjectValue(DicomTag tag, object value) {
@@ -1071,6 +1071,19 @@ namespace Dicom.Data {
 						Debug.Log.Debug("Unable to bind field: " + e.Message);
 					}
 				}
+
+				if (field.FieldType == typeof(IList<DcmFieldAttributeValuePair>)) {
+					IList<DcmFieldAttributeValuePair> list = (IList<DcmFieldAttributeValuePair>)field.GetValue(obj);
+					foreach (DcmFieldAttributeValuePair entry in list)	{
+						DcmElement elem = GetElement(entry.Field.Tag);
+						if ((elem == null || (elem.Length == 0 && entry.Field.UseDefaultForZeroLength)) && entry.Field.DefaultValue == DicomFieldDefault.None) {
+							// do nothing
+						}
+						else {
+							entry.Value = LoadDicomFieldValue(elem, elem.GetType(), entry.Field.DefaultValue, entry.Field.UseDefaultForZeroLength);
+						}
+					}
+				}
 			}
 
 			PropertyInfo[] properties = obj.GetType().GetProperties();
@@ -1146,6 +1159,13 @@ namespace Dicom.Data {
 					DicomFieldAttribute dfa = (DicomFieldAttribute)field.GetCustomAttributes(typeof(DicomFieldAttribute), true)[0];
 					object value = field.GetValue(obj);
 					SaveDicomFieldValue(dfa.Tag, value, dfa.CreateEmptyElement);
+				}
+
+				if (field.FieldType == typeof(IList<DcmFieldAttributeValuePair>)) {
+					IList<DcmFieldAttributeValuePair> list = (IList<DcmFieldAttributeValuePair>)field.GetValue(obj);
+					foreach (DcmFieldAttributeValuePair entry in list) {
+						SaveDicomFieldValue(entry.Field.Tag, entry.Value, entry.Field.CreateEmptyElement);				
+					}
 				}
 			}
 

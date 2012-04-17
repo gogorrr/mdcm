@@ -156,6 +156,28 @@ void DcmJpegLsCodec::Decode(DcmDataset^ dataset, DcmPixelData^ oldPixelData, Dcm
 	}
 }
 
+void DcmJpegLsCodec::Decode(DcmDataset^ dataset, DcmPixelData^ oldPixelData, DcmPixelData^ newPixelData, DcmCodecParameters^ parameters, int frame) {
+	array<unsigned char>^ destArray = gcnew array<unsigned char>(oldPixelData->UncompressedFrameSize);
+	pin_ptr<unsigned char> destPin = &destArray[0];
+	void* destData = destPin;
+	size_t destDataSize = destArray->Length;
+
+	
+	array<unsigned char>^ jpegArray = oldPixelData->GetFrameDataU8(frame);
+	pin_ptr<unsigned char> jpegPin = &jpegArray[0];
+	void* jpegData = jpegPin;
+	size_t jpegDataSize = jpegArray->Length;
+
+	JlsParameters params = {0};
+
+	JLS_ERROR err = JpegLsDecode(destData, destDataSize, jpegData, jpegDataSize, &params);
+	if (err != OK) throw gcnew DicomJpegLsCodecException(err);
+
+	oldPixelData->Unload();
+
+	newPixelData->AddFrame(destArray);
+}
+
 void DcmJpegLsCodec::Register() {
 	DicomCodec::RegisterCodec(DicomTransferSyntax::JPEGLSNearLossless, DcmJpegLsNearLosslessCodec::typeid);
 	DicomCodec::RegisterCodec(DicomTransferSyntax::JPEGLSLossless, DcmJpegLsLosslessCodec::typeid);

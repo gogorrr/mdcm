@@ -78,6 +78,7 @@
     <Compile Include="Codec\DicomCodec.cs" />
     <Compile Include="Codec\DcmRleCodec.cs" />
     <Compile Include="Data\DcmEncoding.cs" />
+    <Compile Include="Data\DcmFieldAttributeValuePair.cs" />
     <Compile Include="Data\DicomFileScanner.cs" />
     <Compile Include="Data\DicomMatch.cs" />
     <Compile Include="Data\DicomTransform.cs" />
@@ -126,6 +127,7 @@
     <Compile Include="Network\HookStream.cs" />
     <Compile Include="Network\NetworkErrorStream.cs" />
     <Compile Include="Network\OpenSSL.cs" />
+    <Compile Include="Network\Server\QRService.cs" />
     <Compile Include="Network\ThrottleStream.cs" />
     <Compile Include="HL7\MLLP.cs" />
     <Compile Include="IO\FileSegment.cs" />

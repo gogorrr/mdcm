@@ -459,6 +459,53 @@ namespace Dicom.Codec {
 				newPixelData.AddFrame(frameData);
 			}
 		}
+
+		public void Decode(DcmDataset dataset, DcmPixelData oldPixelData, DcmPixelData newPixelData, DcmCodecParameters parameters, int frame)
+		{
+			DcmRleCodecParameters rleParams = parameters as DcmRleCodecParameters;
+
+			if (rleParams == null)
+				rleParams = GetDefaultParameters() as DcmRleCodecParameters;
+
+			int pixelCount = oldPixelData.ImageWidth * oldPixelData.ImageHeight;
+			int numberOfSegments = oldPixelData.BytesAllocated * oldPixelData.SamplesPerPixel;
+
+			byte[] frameData = new byte[newPixelData.UncompressedFrameSize];
+
+			IList<ByteBuffer> rleData = oldPixelData.GetFrameFragments(frame);
+			RLEDecoder decoder = new RLEDecoder(rleData);
+
+			if (decoder.NumberOfSegments != numberOfSegments)
+				throw new DicomCodecException("Unexpected number of RLE segments!");
+
+			for (int s = 0; s < numberOfSegments; s++)
+			{
+				int sample = s / newPixelData.BytesAllocated;
+				int sabyte = s % newPixelData.BytesAllocated;
+
+				int pos, offset;
+
+				if (newPixelData.PlanarConfiguration == 0)
+				{
+					pos = sample * newPixelData.BytesAllocated;
+					offset = newPixelData.SamplesPerPixel * newPixelData.BytesAllocated;
+				}
+				else
+				{
+					pos = sample * newPixelData.BytesAllocated * pixelCount;
+					offset = newPixelData.BytesAllocated;
+				}
+
+				if (rleParams.ReverseByteOrder)
+					pos += sabyte;
+				else
+					pos += newPixelData.BytesAllocated - sabyte - 1;
+
+				decoder.DecodeSegment(s, frameData, pos, offset);
+			}
+
+			newPixelData.AddFrame(frameData);
+		}
 		#endregion
 	}
 }

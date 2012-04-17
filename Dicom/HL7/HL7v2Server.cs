@@ -1,7 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 
 namespace Dicom.HL7 {
@@ -11,7 +11,7 @@ namespace Dicom.HL7 {
 	/// <param name="client">Connection to remote client</param>
 	/// <param name="hl7">Received HL7v2 message</param>
 	/// <returns>HL7 message to respond with or null if no response required</returns>
-	public delegate HL7v2 HL7v2MessageCallback(MLLP client, HL7v2 hl7);
+	public delegate HL7v2 HL7v2MessageCallback(MLLP client, HL7v2 hl7, Socket socket);
 
 	public class HL7v2Server {
 		#region Private Members
@@ -19,11 +19,13 @@ namespace Dicom.HL7 {
 		private TcpListener _listener;
 		private int _clients = 0;
 		private bool _stop = false;
+        private Encoding _encoding = Encoding.Default;
 		#endregion
 
 		#region Public Constructor
-		public HL7v2Server(int port) {
+		public HL7v2Server(int port, Encoding encoding) {
 			_port = port;
+            _encoding = encoding;
 		}
 		#endregion
 
@@ -82,7 +84,7 @@ namespace Dicom.HL7 {
 				Debug.Log.Info("HL7 client connected: " + socket.RemoteEndPoint);
 
 				NetworkStream stream = new NetworkStream(socket);
-				MLLP mllp = new MLLP(stream, false);
+                MLLP mllp = new MLLP(stream, false, _encoding);
 
 				while (socket.Connected && !_stop) {
 					if (!socket.Poll(100000, SelectMode.SelectRead))
@@ -102,7 +104,7 @@ namespace Dicom.HL7 {
 					if (OnReceiveMessage != null) {
 						try {
 							HL7v2 req = HL7v2.Parse(hl7);
-							HL7v2 rsp = OnReceiveMessage(mllp, req);
+							HL7v2 rsp = OnReceiveMessage(mllp, req, socket);
 							if (rsp != null)
 								mllp.Send(rsp.ToString());
 						} catch (Exception ex) {
@@ -111,14 +113,14 @@ namespace Dicom.HL7 {
 					}
 				}
 
+				Debug.Log.Info("HL7 client closed: " + socket.RemoteEndPoint);
+
 				try {
 					socket.Close();
 				} catch {
 				}
-
-				Debug.Log.Info("HL7 client closed: " + socket.RemoteEndPoint);
 			} catch {
-				Debug.Log.Info("HL7 client closed on error: " + socket.RemoteEndPoint);
+				Debug.Log.Info("HL7 client closed on error");
 			} finally {
 				Interlocked.Decrement(ref _clients);
 			}

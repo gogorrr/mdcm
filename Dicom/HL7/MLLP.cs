@@ -32,14 +32,16 @@ namespace Dicom.HL7 {
 
 		private Stream _stream;
 		private bool _version3;
+        private Encoding _encoding;
 
-		public MLLP(Stream stream, bool version3) {
+		public MLLP(Stream stream, bool version3, Encoding encoding) {
 			_stream = stream;
 			_version3 = version3;
+            _encoding = encoding;
 		}
 
 		public bool Send(string message) {
-			byte[] bytes = Encoding.ASCII.GetBytes(message);
+            byte[] bytes = _encoding.GetBytes(message);
 			_stream.Write(StartBlock, 0, StartBlock.Length);
 			_stream.Write(bytes, 0, bytes.Length);
 			_stream.Write(EndBlock, 0, EndBlock.Length);
@@ -75,7 +77,7 @@ namespace Dicom.HL7 {
 				_stream.Write(ACK, 0, ACK.Length);
 				_stream.Flush();
 			}
-			return Encoding.ASCII.GetString(ms.ToArray());
+            return _encoding.GetString(ms.ToArray());
 		}
 	}
 }

@@ -51,6 +51,7 @@ public:
 
 	virtual void Encode(DcmDataset^ dataset, DcmPixelData^ oldPixelData, DcmPixelData^ newPixelData, DcmCodecParameters^ parameters);
 	virtual void Decode(DcmDataset^ dataset, DcmPixelData^ oldPixelData, DcmPixelData^ newPixelData, DcmCodecParameters^ parameters);
+	virtual void Decode(DcmDataset^ dataset, DcmPixelData^ oldPixelData, DcmPixelData^ newPixelData, DcmCodecParameters^ parameters, int frame);
 
 	virtual IJpegCodec^ GetCodec(int bits, DcmJpegParameters^ jparams) = 0;
 

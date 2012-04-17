@@ -37,7 +37,7 @@ namespace Dicom.HL7 {
 						SegmentNumber = 1;
 					}
 
-					string[] parts = tag.Split('.');
+					string[] parts = tag.Split('-');
 					if (parts.Length > 4)
 						throw new Exception();
 
@@ -57,11 +57,11 @@ namespace Dicom.HL7 {
 				if (SegmentNumber > 1)
 					tag += "[" + SegmentNumber.ToString() + "]";
 				if (Field > 0)
-					tag += "." + Field.ToString();
+					tag += "-" + Field.ToString();
 				if (Component > 0)
-					tag += "." + Component.ToString();
+					tag += "-" + Component.ToString();
 				if (SubComponent > 0)
-					tag += "." + SubComponent.ToString();
+					tag += "-" + SubComponent.ToString();
 				return tag;
 			}
 		}

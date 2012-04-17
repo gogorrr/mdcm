@@ -132,7 +132,7 @@ namespace Dicom.Network {
 				return DataSetType != (ushort)0x0101;
 			}
 			set {
-				DataSetType = value ? (ushort)0x0202 : (ushort)0x0101;
+				DataSetType = value ? (ushort)0x0102 : (ushort)0x0101;
 			}
 		}
 

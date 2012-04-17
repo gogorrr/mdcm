@@ -76,8 +76,9 @@ namespace Dicom.Network.Server {
 
 						Dicom.Debug.Log.Info("DICOM {0} server listening on port {1}", _types[i].ToString(), _ports[i]);
 					}
-					catch {
-						Dicom.Debug.Log.Error("Unable to start DICOM {0} server on port {1}; Check to see that no other network services are using this port and try again.", _types[i].ToString(), _ports[i]); 
+					catch(Exception ex) {
+						Dicom.Debug.Log.Error("Unable to start DICOM {0} server on port {1}; Check to see that no other network services are using this port and try again.", _types[i].ToString(), _ports[i]);
+						throw ex;
 					}
 				}
 			}

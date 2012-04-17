@@ -274,6 +274,10 @@ namespace Dicom.Network.Client {
 			}
 
 			if (_dataset != null) {
+				if (_userState != null) {
+					_dataset.SaveDicomFields(_userState);
+				}
+
 				client.SendCStoreRequest(pcid, SOPInstanceUID, _dataset);
 			}
 			else {

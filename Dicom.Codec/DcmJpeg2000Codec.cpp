@@ -382,6 +382,128 @@ void DcmJpeg2000Codec::Decode(DcmDataset^ dataset, DcmPixelData^ oldPixelData, D
 	}
 }
 
+void DcmJpeg2000Codec::Decode(DcmDataset^ dataset, DcmPixelData^ oldPixelData, DcmPixelData^ newPixelData, DcmCodecParameters^ parameters, int frame) {
+	DcmJpeg2000Parameters^ jparams = (DcmJpeg2000Parameters^)parameters;
+	if (jparams == nullptr)
+		jparams = (DcmJpeg2000Parameters^)GetDefaultParameters();
+
+	array<unsigned char>^ destArray = gcnew array<unsigned char>(oldPixelData->UncompressedFrameSize);
+	pin_ptr<unsigned char> destPin = &destArray[0];
+	unsigned char* destData = destPin;
+	const int destDataSize = destArray->Length;
+
+	const int pixelCount = oldPixelData->ImageHeight * oldPixelData->ImageWidth;
+
+	if (newPixelData->PhotometricInterpretation == "YBR_RCT" || newPixelData->PhotometricInterpretation == "YBR_ICT")
+		newPixelData->PhotometricInterpretation = "RGB";
+
+	if (newPixelData->PhotometricInterpretation == "YBR_FULL_422" || newPixelData->PhotometricInterpretation == "YBR_PARTIAL_422")
+		newPixelData->PhotometricInterpretation = "YBR_FULL";
+	
+	if (newPixelData->PhotometricInterpretation == "YBR_FULL")
+		newPixelData->PlanarConfiguration = 1;
+
+	array<unsigned char>^ jpegArray = oldPixelData->GetFrameDataU8(frame);
+	pin_ptr<unsigned char> jpegPin = &jpegArray[0];
+	unsigned char* jpegData = jpegPin;
+	const int jpegDataSize = jpegArray->Length;
+
+	opj_dparameters_t dparams;
+	opj_event_mgr_t event_mgr;
+	opj_image_t *image = NULL;
+	opj_dinfo_t* dinfo = NULL;
+	opj_cio_t *cio = NULL;
+
+	memset(&event_mgr, 0, sizeof(opj_event_mgr_t));
+	event_mgr.error_handler = opj_error_callback;
+	if (jparams->IsVerbose) {
+		event_mgr.warning_handler = opj_warning_callback;
+		event_mgr.info_handler = opj_info_callback;
+	}
+
+	opj_set_default_decoder_parameters(&dparams);
+	dparams.cp_layer=0;
+	dparams.cp_reduce=0;
+
+	try {
+		dinfo = opj_create_decompress(CODEC_J2K);
+
+		opj_set_event_mgr((opj_common_ptr)dinfo, &event_mgr, NULL);
+
+		opj_setup_decoder(dinfo, &dparams);
+
+		bool opj_err = false;
+		dinfo->client_data = (void*)&opj_err;
+
+		cio = opj_cio_open((opj_common_ptr)dinfo, jpegData, (int)jpegDataSize);
+		image = opj_decode(dinfo, cio);
+
+		oldPixelData->Unload();
+
+		if (image == nullptr)
+			throw gcnew DicomCodecException("Error in JPEG 2000 code stream!");
+
+		for (int c = 0; c < image->numcomps; c++) {
+			opj_image_comp_t* comp = &image->comps[c];
+
+			int pos = newPixelData->IsPlanar ? (c * pixelCount) : c;
+			const int offset = newPixelData->IsPlanar ? 1 : image->numcomps;
+
+			if (newPixelData->BytesAllocated == 1) {
+				if (comp->sgnd) {
+					const unsigned char sign = 1 << newPixelData->HighBit;
+					for (int p = 0; p < pixelCount; p++) {
+						const int i = comp->data[p];
+						if (i < 0)
+							destArray[pos] = (unsigned char)(-i | sign);
+						else
+							destArray[pos] = (unsigned char)(i);
+						pos += offset;
+					}
+				}
+				else {
+					for (int p = 0; p < pixelCount; p++) {
+						destArray[pos] = (unsigned char)comp->data[p];
+						pos += offset;
+					}
+				}
+			}
+			else if (newPixelData->BytesAllocated == 2) {
+				const unsigned short sign = 1 << newPixelData->HighBit;
+				unsigned short* destData16 = (unsigned short*)destData;
+				if (comp->sgnd) {
+					for (int p = 0; p < pixelCount; p++) {
+						const int i = comp->data[p];
+						if (i < 0)
+							destData16[pos] = (unsigned short)(-i | sign);
+						else
+							destData16[pos] = (unsigned short)(i);
+						pos += offset;
+					}
+				}
+				else {
+					for (int p = 0; p < pixelCount; p++) {
+						destData16[pos] = (unsigned short)comp->data[p];
+						pos += offset;
+					}
+				}
+			}
+			else
+				throw gcnew DicomCodecException("JPEG 2000 module only supports Bytes Allocated == 8 or 16!");
+		}
+
+		newPixelData->AddFrame(destArray);
+	}
+	finally {
+		if (cio != nullptr)
+			opj_cio_close(cio);
+		if (dinfo != nullptr)
+			opj_destroy_decompress(dinfo);
+		if (image != nullptr)
+			opj_image_destroy(image);
+  }
+}
+
 void DcmJpeg2000Codec::Register() {
 	DicomCodec::RegisterCodec(DicomTransferSyntax::JPEG2000Lossy, DcmJpeg2000LossyCodec::typeid);
 	DicomCodec::RegisterCodec(DicomTransferSyntax::JPEG2000Lossless, DcmJpeg2000LosslessCodec::typeid);
