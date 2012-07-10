@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+#if !SILVERLIGHT
 using System.Drawing;
 using System.Drawing.Imaging;
+#endif
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Text;
-
 using Dicom;
 using Dicom.Data;
 using Dicom.Imaging.LUT;
@@ -16,8 +19,12 @@ namespace Dicom.Imaging {
 	/// </summary>
 	public class DicomImage {
 		#region Private Members
+		private const int OverlayColor = unchecked((int)0xffff00ff);
+
 		private IPixelData _pixelData;
 		private IPipeline _pipeline;
+
+		private DcmOverlayData[] _overlays;
 		#endregion
 
 		/// <summary>Creates DICOM image object from dataset</summary>
@@ -26,6 +33,7 @@ namespace Dicom.Imaging {
 			Load(dataset);
 		}
 
+#if !SILVERLIGHT
 		/// <summary>Creates DICOM image object from file</summary>
 		/// <param name="fileName">Source file</param>
 		public DicomImage(string fileName) {
@@ -33,6 +41,7 @@ namespace Dicom.Imaging {
 			ff.Load(fileName, DicomReadOptions.Default);
 			Load(ff.Dataset);
 		}
+#endif
 
 		/// <summary>Source DICOM dataset</summary>
 		public DcmDataset Dataset {
@@ -52,26 +61,41 @@ namespace Dicom.Imaging {
 
 		/// <summary>Renders DICOM image to System.Drawing.Image</summary>
 		/// <returns>Rendered image</returns>
-		public Image Render() {
-      return Render(0);
-		}
+#if !SILVERLIGHT
+		public Image RenderImage()
+		{
+			ImageGraphic graphic = new ImageGraphic(_pixelData);
 
-    /// <summary>Renders DICOM image to System.Drawing.Image</summary>
-    /// <param name="frame">Frame number</param>
-    /// <returns>Rendered image</returns>
-    public Image Render(int frame) {
-      DcmPixelData pixelData = new DcmPixelData(Dataset);
-      _pixelData = PixelDataFactory.Create(pixelData, frame);
-      _pipeline = PipelineFactory.Create(Dataset, pixelData);
-      pixelData.Unload();
-      ImageGraphic graphic = new ImageGraphic(_pixelData);
-      return graphic.RenderImage(_pipeline.LUT);
-    }
+			foreach (var overlay in _overlays) {
+				OverlayGraphic og = new OverlayGraphic(PixelDataFactory.Create(overlay), overlay.OriginX, overlay.OriginY, OverlayColor);
+				graphic.AddOverlay(og);
+			}
+
+			return graphic.RenderImage(_pipeline.LUT);
+		}
+#endif
+
+		public ImageSource RenderImageSource() {
+			ImageGraphic graphic = new ImageGraphic(_pixelData);
+
+			foreach (var overlay in _overlays) {
+				OverlayGraphic og = new OverlayGraphic(PixelDataFactory.Create(overlay), overlay.OriginX, overlay.OriginY, OverlayColor);
+				graphic.AddOverlay(og);
+			}
+
+			return graphic.RenderImageSource(_pipeline.LUT);
+		}
 
 		private void Load(DcmDataset dataset) {
 			Dataset = dataset;
 			if (Dataset.InternalTransferSyntax.IsEncapsulated)
 				Dataset.ChangeTransferSyntax(DicomTransferSyntax.ExplicitVRLittleEndian, null);
+			DcmPixelData pixelData = new DcmPixelData(Dataset);
+			_pixelData = PixelDataFactory.Create(pixelData, 0);
+			_pipeline = PipelineFactory.Create(Dataset, pixelData);
+			pixelData.Unload();
+
+			_overlays = DcmOverlayData.FromDataset(Dataset);
 		}
 	}
 }

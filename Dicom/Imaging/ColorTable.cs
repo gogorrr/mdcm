@@ -20,26 +20,25 @@
 //    Colby Dillion (colby.dillion@gmail.com)
 
 using System;
-using System.Drawing;
-using System.Drawing.Imaging;
+using System.Windows.Media;
 using System.IO;
 
 namespace Dicom.Imaging {
 	public static class ColorTable {
-		#region LUT
 		public readonly static Color[] Monochrome1 = InitGrayscaleLUT(true);
 		public readonly static Color[] Monochrome2 = InitGrayscaleLUT(false);
 
 		private static Color[] InitGrayscaleLUT(bool reverse) {
 			Color[] LUT = new Color[256];
-			int i; byte b;
+			int i;
+			byte b;
 			if (reverse) {
 				for (i = 0, b = 255; i < 256; i++, b--) {
-					LUT[i] = Color.FromArgb(b, b, b);
+					LUT[i] = Color.FromArgb(0xff, b, b, b);
 				}
 			} else {
 				for (i = 0, b = 0; i < 256; i++, b++) {
-					LUT[i] = Color.FromArgb(b, b, b);
+					LUT[i] = Color.FromArgb(0xff, b, b, b);
 				}
 			}
 			return LUT;
@@ -60,7 +59,7 @@ namespace Dicom.Imaging {
 
 				Color[] LUT = new Color[256];
 				for (int i = 0; i < 256; i++) {
-					LUT[i] = Color.FromArgb(data[i], data[i + 256], data[i + 512]);
+					LUT[i] = Color.FromArgb(0xff, data[i], data[i + 256], data[i + 512]);
 				}
 				return LUT;
 			} catch {
@@ -77,13 +76,14 @@ namespace Dicom.Imaging {
 			fs.Close();
 		}
 
-		public static void Apply(Image image, Color[] lut) {
-			ColorPalette palette = image.Palette;
+#if !SILVERLIGHT
+		public static void Apply(System.Drawing.Image image, Color[] lut) {
+			System.Drawing.Imaging.ColorPalette palette = image.Palette;
 			for (int i = 0; i < palette.Entries.Length; i++)
-				palette.Entries[i] = lut[i];
+				palette.Entries[i] = System.Drawing.Color.FromArgb(lut[i].A, lut[i].R, lut[i].G, lut[i].B);
 			image.Palette = palette;
 		}
-		#endregion
+#endif
 	}
 }
 

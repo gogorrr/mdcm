@@ -37,11 +37,15 @@ namespace Dicom.HL7 {
 		public MLLP(Stream stream, bool version3, Encoding encoding) {
 			_stream = stream;
 			_version3 = version3;
-            _encoding = encoding;
+			_encoding = encoding;
 		}
 
 		public bool Send(string message) {
-            byte[] bytes = _encoding.GetBytes(message);
+#if SILVERLIGHT
+			byte[] bytes = Encoding.UTF8.GetBytes(message);
+#else
+			byte[] bytes = _encoding.GetBytes(message);
+#endif
 			_stream.Write(StartBlock, 0, StartBlock.Length);
 			_stream.Write(bytes, 0, bytes.Length);
 			_stream.Write(EndBlock, 0, EndBlock.Length);
@@ -77,7 +81,11 @@ namespace Dicom.HL7 {
 				_stream.Write(ACK, 0, ACK.Length);
 				_stream.Flush();
 			}
-            return _encoding.GetString(ms.ToArray());
+#if SILVERLIGHT
+            return Encoding.UTF8.GetString(ms.ToArray(), 0, (int)ms.Length);
+#else
+			return _encoding.GetString(ms.ToArray());
+#endif
 		}
 	}
 }

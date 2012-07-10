@@ -22,44 +22,53 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+#if !SILVERLIGHT
+using System.Threading.Tasks;
+#endif
 
 namespace Dicom.Utility {
 	public static class MultiThread {
 		public delegate void ProcessDelegate();
+#if !SILVERLIGHT
 		public static void ProcessCallback(IAsyncResult result) {
 			((ProcessDelegate)result.AsyncState).EndInvoke(result);
 		}
+#endif
 
-		public delegate void ForDelegate(int n);
-		public static void For(int start, int end, ForDelegate action) {
-			For(start, end, 4, action);
-		}
-		public static void For(int start, int end, int chunkSize, ForDelegate action) {
+		public static void For(int start, int end, Action<int> action) {
+#if SILVERLIGHT
 			object oLock = new object();
-
 			ProcessDelegate process = delegate() {
 				for (int n = 0; n < end;) {
 					lock (oLock) {
 						n = start;
-						start += chunkSize;
+						start++;
 					}
 
-					for (int k = 0; k < chunkSize && n < end; k++, n++) {
-						action(n);
-					}
+					action(n);
 				}
 			};
 
 			int threads = Environment.ProcessorCount;
 			WaitHandle[] handles = new WaitHandle[threads];
 			for (int i = 0; i < threads; i++) {
-				handles[i] = process.BeginInvoke(ProcessCallback, process).AsyncWaitHandle;
+
+                handles[i] = new ManualResetEvent(false);
+			    ThreadPool.QueueUserWorkItem(delegate(object state)
+			                                     {
+			                                         process();
+			                                         ((ManualResetEvent)state).Set();
+			                                     }, handles[i]);
 			}
 			WaitHandle.WaitAll(handles);
+#else
+			Parallel.For(start, end, action);
+#endif
+			
 		}
 
-		public delegate void ForEachDelegate<T>(T item);
-		public static void ForEach<T>(IEnumerable<T> enumerable, ForEachDelegate<T> action) {
+		public static void ForEach<T>(IEnumerable<T> enumerable, Action<T> action) {
+#if SILVERLIGHT
 			IEnumerator<T> enumerator = enumerable.GetEnumerator();
 			object oLock = new object();
 
@@ -80,9 +89,18 @@ namespace Dicom.Utility {
 			int threads = Environment.ProcessorCount;
 			WaitHandle[] handles = new WaitHandle[threads];
 			for (int i = 0; i < threads; i++) {
-				handles[i] = process.BeginInvoke(ProcessCallback, process).AsyncWaitHandle;
+
+                handles[i] = new ManualResetEvent(false);
+                ThreadPool.QueueUserWorkItem(delegate(object state)
+                                                 {
+                                                     process();
+                                                     ((ManualResetEvent)state).Set();
+                                                 }, handles[i]);
 			}
 			WaitHandle.WaitAll(handles);
+#else
+			Parallel.ForEach(enumerable, action);
+#endif
 		}
 	}
 }

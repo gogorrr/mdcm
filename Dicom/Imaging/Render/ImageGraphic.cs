@@ -20,10 +20,16 @@
 //    Colby Dillion (colby.dillion@gmail.com)
 
 using System;
+using System.Collections.Generic;
+#if !SILVERLIGHT
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
+#endif
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Threading;
-
 using Dicom.Utility;
 
 using Dicom.Imaging.Algorithms;
@@ -37,7 +43,13 @@ namespace Dicom.Imaging.Render {
 		protected IPixelData _scaledData;
 
 		protected PinnedIntArray _pixels;
+#if SILVERLIGHT
+		protected WriteableBitmap _bitmap;
+#else
+	    private const int DPI = 96;
+		protected BitmapSource _bitmapSource;
 		protected Bitmap _bitmap;
+#endif
 
 		protected double _scaleFactor;
 		protected int _rotation;
@@ -48,6 +60,8 @@ namespace Dicom.Imaging.Render {
 
 		protected int _zorder;
 		protected bool _applyLut;
+
+		protected List<OverlayGraphic> _overlays;
 		#endregion
 
 		#region Public Properties
@@ -108,17 +122,24 @@ namespace Dicom.Imaging.Render {
 		#endregion
 
 		#region Public Constructors
-		public ImageGraphic(IPixelData pixelData) {
+		public ImageGraphic(IPixelData pixelData) : this() {
 			_originalData = pixelData;
-			_zorder = 255;
-			_applyLut = true;
 			Scale(1.0);
 		}
 
-		protected ImageGraphic() { }
+		protected ImageGraphic() {
+			_zorder = 255;
+			_applyLut = true;
+			_overlays = new List<OverlayGraphic>();
+		}
 		#endregion
 
 		#region Public Members
+		public void AddOverlay(OverlayGraphic overlay) {
+			_overlays.Add(overlay);
+			overlay.Scale(_scaleFactor);
+		}
+
 		public void Reset() {
 			Scale(1.0);
 			_rotation = 0;
@@ -136,6 +157,10 @@ namespace Dicom.Imaging.Render {
 				_pixels.Dispose();
 				_pixels = null;
 				_bitmap = null;
+			}
+
+			foreach (var overlay in _overlays) {
+				overlay.Scale(scale);
 			}
 		}
 
@@ -184,23 +209,118 @@ namespace Dicom.Imaging.Render {
 			_flipY = flipy;
 		}
 
-		public Image RenderImage(ILUT lut) {
+#if SILVERLIGHT
+		public BitmapSource RenderImageSource(ILUT lut)
+		{
 			bool render = false;
+
 			if (_bitmap == null) {
-				PixelFormat format = Components == 4 ? PixelFormat.Format32bppArgb : PixelFormat.Format32bppRgb;
 				_pixels = new PinnedIntArray(ScaledData.Width * ScaledData.Height);
-				_bitmap = new Bitmap(ScaledData.Width, ScaledData.Height, ScaledData.Width * 4, format, _pixels.Pointer);
+				_bitmap = new WriteableBitmap(ScaledData.Width, ScaledData.Height);
 				render = true;
 			}
+
 			if (_applyLut && lut != null && !lut.IsValid) {
 				lut.Recalculate();
 				render = true;
 			}
-			_bitmap.RotateFlip(RotateFlipType.RotateNoneFlipNone);
+
 			if (render) {
 				ScaledData.Render((_applyLut ? lut : null), _pixels.Data);
+
+				foreach (var overlay in _overlays) {
+					overlay.Render(_pixels.Data, ScaledData.Width, ScaledData.Height);
+				}
 			}
+
+			MultiThread.For(0, _pixels.Count, delegate(int i) { _bitmap.Pixels[i] = _pixels.Data[i]; });
+
+			_bitmap.Rotate(_rotation);
+
+			if (_flipX) _bitmap.Flip(WriteableBitmapExtensions.FlipMode.Horizontal);
+			if (_flipY) _bitmap.Flip(WriteableBitmapExtensions.FlipMode.Vertical);
+
+			_bitmap.Invalidate();
+
+			return _bitmap;
+		}
+#else
+		public BitmapSource RenderImageSource(ILUT lut) {
+			bool render = false;
+
+			if (_applyLut && lut != null && !lut.IsValid) {
+				lut.Recalculate();
+				render = true;
+			}
+
+			if (_bitmapSource == null || render) {
+				_pixels = new PinnedIntArray(ScaledData.Width * ScaledData.Height);
+
+				ScaledData.Render((_applyLut ? lut : null), _pixels.Data);
+
+				foreach (var overlay in _overlays) {
+					overlay.Render(_pixels.Data, ScaledData.Width, ScaledData.Height);
+				}
+
+				_bitmapSource = RenderBitmapSource(ScaledData.Width, ScaledData.Height, _pixels.Data);
+			}
+
+			if (_rotation != 0 || _flipX || _flipY) {
+				TransformGroup rotFlipTransform = new TransformGroup();
+				rotFlipTransform.Children.Add(new RotateTransform(_rotation));
+				rotFlipTransform.Children.Add(new ScaleTransform(_flipX ? -1 : 1, _flipY ? -1 : 1));
+				_bitmapSource = new TransformedBitmap(_bitmapSource, rotFlipTransform);
+			}
+
+			return _bitmapSource;
+		}
+
+		private static BitmapSource RenderBitmapSource(int iWidth, int iHeight, int[] iPixelData) {
+			var bitmap = new WriteableBitmap(iWidth, iHeight, DPI, DPI, PixelFormats.Bgr32, null);
+
+			// Reserve the back buffer for updates.
+			bitmap.Lock();
+
+			Marshal.Copy(iPixelData, 0, bitmap.BackBuffer, iPixelData.Length);
+
+			// Specify the area of the bitmap that changed.
+			bitmap.AddDirtyRect(new Int32Rect(0, 0, (int)bitmap.Width, (int)bitmap.Height));
+
+			// Release the back buffer and make it available for display.
+			bitmap.Unlock();
+
+			return bitmap;
+		}
+
+		public Image RenderImage(ILUT lut) {
+			bool render = false;
+
+			if (_bitmap == null) {
+				System.Drawing.Imaging.PixelFormat format = Components == 4 
+					? System.Drawing.Imaging.PixelFormat.Format32bppArgb 
+					: System.Drawing.Imaging.PixelFormat.Format32bppRgb;
+				_pixels = new PinnedIntArray(ScaledData.Width * ScaledData.Height);
+				_bitmap = new Bitmap(ScaledData.Width, ScaledData.Height, ScaledData.Width * 4, format, _pixels.Pointer);
+				render = true;
+			}
+
+			if (_applyLut && lut != null && !lut.IsValid) {
+				lut.Recalculate();
+				render = true;
+			}
+
+			_bitmap.RotateFlip(RotateFlipType.RotateNoneFlipNone);
+
+			if (render) {
+				ScaledData.Render((_applyLut ? lut : null), _pixels.Data);
+
+				foreach (var overlay in _overlays) {
+					overlay.Render(_pixels.Data, ScaledData.Width, ScaledData.Height);
+				}
+			}
+
 			_bitmap.RotateFlip(GetRotateFlipType());
+
 			return _bitmap;
 		}
 
@@ -235,6 +355,7 @@ namespace Dicom.Imaging.Render {
 				}
 			}
 		}
+#endif
 		#endregion
 	}
 }
