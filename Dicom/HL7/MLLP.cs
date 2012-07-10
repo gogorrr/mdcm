@@ -32,16 +32,16 @@ namespace Dicom.HL7 {
 
 		private Stream _stream;
 		private bool _version3;
-        private Encoding _encoding;
+		private Encoding _encoding;
 
 		public MLLP(Stream stream, bool version3, Encoding encoding) {
 			_stream = stream;
 			_version3 = version3;
-            _encoding = encoding;
+			_encoding = encoding;
 		}
 
 		public bool Send(string message) {
-            byte[] bytes = _encoding.GetBytes(message);
+			byte[] bytes = _encoding.GetBytes(message);
 			_stream.Write(StartBlock, 0, StartBlock.Length);
 			_stream.Write(bytes, 0, bytes.Length);
 			_stream.Write(EndBlock, 0, EndBlock.Length);
@@ -55,29 +55,47 @@ namespace Dicom.HL7 {
 			return true;
 		}
 
-		public string Receive() {
+		public bool Receive(out string message) {
+			message = null;
 			int ib = 0x00;
-			MemoryStream ms = new MemoryStream();
-			for (; _stream.ReadByte() != 0x0B; ) ;
-			while (true) {
-				if (ib == 0x1C) {
+
+			using (MemoryStream ms = new MemoryStream()) {
+				while (true) {
 					ib = _stream.ReadByte();
-					if (ib == 0x0D)
+					if (ib == 0x0B)
 						break;
-					ms.WriteByte(0x1C);
-					ms.WriteByte((byte)ib);
+					else if (ib == -1)
+						return false;
 				}
-				else {
-					ib = _stream.ReadByte();
-					if (ib != 0x1C)
+
+				while (true) {
+					if (ib == 0x1C) {
+						ib = _stream.ReadByte();
+						if (ib == 0x0D)
+							break;
+						else if (ib == -1)
+							return false;
+				
+						ms.WriteByte(0x1C);
 						ms.WriteByte((byte)ib);
+					}
+					else {
+						ib = _stream.ReadByte();
+						if (ib != 0x1C)
+							ms.WriteByte((byte)ib);
+						else if (ib == -1)
+							return false;
+					}
 				}
+
+				if (_version3) {
+						_stream.Write(ACK, 0, ACK.Length);
+						_stream.Flush();
+				}
+
+				message = _encoding.GetString(ms.ToArray());
 			}
-			if (_version3) {
-				_stream.Write(ACK, 0, ACK.Length);
-				_stream.Flush();
-			}
-            return _encoding.GetString(ms.ToArray());
+			return true;
 		}
 	}
 }
